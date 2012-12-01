@@ -1,0 +1,12 @@
+[Desktop Entry]
+Comment=
+Encoding=UTF-8
+Exec=harvest-gtk
+GenericName=Harvest
+Icon=/usr/share/icons/harvest-gtk.png
+MimeType=
+Name=Harvest
+StartupNotify=false
+Terminal=false
+TerminalOptions=
+Type=Application
