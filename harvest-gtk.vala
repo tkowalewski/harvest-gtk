@@ -98,6 +98,8 @@ namespace Harvest {
 		ComboBoxText task;
 		Gtk.Label status;
 
+		string VERSION = "0.1.1";
+
 		private ArrayList<Project?> projects;
 
 		public Application() {
@@ -133,7 +135,6 @@ namespace Harvest {
 
 			authentication = new Gtk.ToggleToolButton.from_stock(Gtk.Stock.DIALOG_AUTHENTICATION);
 			authentication.clicked.connect(on_authentication_toggle);
-			//authentication.set_active(true);
 
 			about = new Gtk.ToolButton.from_stock (Gtk.Stock.DIALOG_INFO);
 			about.clicked.connect(on_about_clicked);
@@ -169,7 +170,7 @@ namespace Harvest {
 
 			comment = new Gtk.Entry();
 
-			status = new Gtk.Label("Authorize first!");
+			status = new Gtk.Label("");
 			status.justify = Gtk.Justification.LEFT;
 
 			box.pack_start(subdomain, false, false, 0);
@@ -241,6 +242,7 @@ namespace Harvest {
 				harvest_password = password.get_text();
 				if (!request_daily()) {
 					authentication.set_active(false);
+					status.label = "";
 					alert("Can not connect!");
 					return;
 				}
@@ -311,11 +313,13 @@ namespace Harvest {
 			status.label = "Please wait. Starting ...";
 			if (paused) {
 				if (!request_toggle()) {
+					status.label = "";
 					alert("Can not unpause!");
 					return;
 				}
 			} else {
 				if (!request_create()) {
+					status.label = "";
 					alert("Can not start!");
 					return;
 				}
@@ -340,6 +344,7 @@ namespace Harvest {
 		public void on_pause_clicked() {
 			status.label = "Please wait. Pausing ...";
 			if (!request_toggle()) {
+				status.label = "";
 				alert("Can not pause!");
 				return;
 			}
@@ -354,6 +359,7 @@ namespace Harvest {
 		public void on_stop_clicked() {
 			status.label = "Please wait. Stopping ...";
 			if (!request_toggle()) {
+				status.label = "";
 				alert("Can not stop!");
 				return;
 			}
@@ -525,7 +531,7 @@ namespace Harvest {
 			
 			message.request_headers.append("Content-Type", "application/xml");
 			message.request_headers.append("Accept", "application/xml");
-			message.request_headers.append("User-Agent", "Harvest-Gtk 0.1.0");
+			message.request_headers.append("User-Agent", "Harvest-Gtk %s".printf(VERSION));
 
 			string authorization = Base64.encode("%s:%s".printf(harvest_email, harvest_password).data);
 			message.request_headers.append("Authorization", "Basic %s".printf(authorization));
@@ -539,7 +545,6 @@ namespace Harvest {
 			if (session.send_message(message) != status) {
 				new Xml.Doc();
 			}
-			//print((string)message.response_body.data);
 			session.abort();
 			return Xml.Parser.parse_doc((string)message.response_body.flatten().data);
 		}
