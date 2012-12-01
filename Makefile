@@ -15,4 +15,4 @@ install:
 	install -m 0755 $(DESKTOP_FILES) /usr/share/applications
 
 uninstall:
-	test -d $(prefix)/bin && cd $(prefix)/bin && rm -f $(EXEC_FILES)
+	test -d $(prefix)/bin && cd $(prefix)/bin && rm -f $(EXEC_FILES) && rm -f $(ICON_FILES) && rm -f $(DESKTOP_FILES)
