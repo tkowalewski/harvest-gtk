@@ -98,7 +98,7 @@ namespace Harvest {
 		ComboBoxText task;
 		Gtk.Label status;
 
-		string VERSION = "0.1.1";
+		string VERSION = "0.1.3";
 
 		private ArrayList<Project?> projects;
 
@@ -543,7 +543,7 @@ namespace Harvest {
 			}
 
 			if (session.send_message(message) != status) {
-				new Xml.Doc();
+				return new Xml.Doc();
 			}
 			session.abort();
 			return Xml.Parser.parse_doc((string)message.response_body.flatten().data);

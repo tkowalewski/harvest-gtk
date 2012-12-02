@@ -1,7 +1,7 @@
 harvest-gtk
 ===
 
-version: 0.1.1
+version: 0.1.3
 
 ## Requirements
 - valac-0.18
