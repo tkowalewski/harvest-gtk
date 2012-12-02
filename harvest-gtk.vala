@@ -98,7 +98,7 @@ namespace Harvest {
 		ComboBoxText task;
 		Gtk.Label status;
 
-		string VERSION = "0.1.3";
+		string VERSION = "0.1.4";
 
 		private ArrayList<Project?> projects;
 
@@ -169,6 +169,7 @@ namespace Harvest {
 			task.changed.connect(on_task_changed);
 
 			comment = new Gtk.Entry();
+			comment.placeholder_text = "Your comment";
 
 			status = new Gtk.Label("");
 			status.justify = Gtk.Justification.LEFT;
@@ -231,6 +232,9 @@ namespace Harvest {
 					time.hide();
 				}
 
+				project.active = 0;
+				task.active = 0;
+
 				subdomain.show();
 				email.show();
 				password.show();
@@ -259,6 +263,11 @@ namespace Harvest {
 				project.show();
 				task.show();
 				comment.show();
+				start.set_sensitive(false);
+				pause.set_sensitive(false);
+				stop.set_sensitive(false);
+				task.set_sensitive(false);
+				comment.set_sensitive(false);
 				status.label = "";
 			}
 		}
@@ -523,6 +532,7 @@ namespace Harvest {
 			string method = "GET";
 			int status = 200;
 			if (xml.length > 0) {
+				status = 201;
 				method = "POST";
 			}
 			var session = new Soup.SessionAsync();
@@ -536,14 +546,13 @@ namespace Harvest {
 			string authorization = Base64.encode("%s:%s".printf(harvest_email, harvest_password).data);
 			message.request_headers.append("Authorization", "Basic %s".printf(authorization));
 
-			if (method == "POST") {
-				status = 201;
+			if (xml.length > 0) {
 				StringBuilder body = new StringBuilder(xml);
 				message.set_request( "application/xml", MemoryUse.COPY, body.data);
 			}
 
 			if (session.send_message(message) != status) {
-				return new Xml.Doc();
+				return Xml.Parser.parse_doc("");
 			}
 			session.abort();
 			return Xml.Parser.parse_doc((string)message.response_body.flatten().data);
