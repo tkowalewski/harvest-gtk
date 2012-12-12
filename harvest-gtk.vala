@@ -30,18 +30,36 @@ using Xml;
 
 namespace Harvest {
 
-	public class Project : Object {
-		private ArrayList<Task?> _tasks;
-		public ArrayList<Task?> tasks {
-			get { return _tasks; }
-			set { _tasks = value; }
-		}
+	public class Client : Object {
 
 		private int _id;
 
 		public int id {
 			get { return _id; }
 			set { _id = value; }
+		}
+
+		private string _name;
+
+		public string name {
+			get { return _name; }
+			set { _name = value; }
+		}
+	}
+
+	public class Project : Object {
+		private int _id;
+
+		public int id {
+			get { return _id; }
+			set { _id = value; }
+		}
+
+		private int _client_id;
+
+		public int client_id {
+			get { return _client_id; }
+			set { _client_id = value; }
 		}
 
 		private string _name;
@@ -60,6 +78,13 @@ namespace Harvest {
 			set { _id = value; }
 		}
 
+		private int _project_id;
+
+		public int project_id {
+			get { return _project_id; }
+			set { _project_id = value; }
+		}
+
 		private string _name;
 
 		public string name {
@@ -73,7 +98,7 @@ namespace Harvest {
 		Gtk.Window window;
 		Gtk.Box box;
 		Gtk.Toolbar toolbar;
-		Gtk.ToggleToolButton authentication;
+		Gtk.Button authentication;
 		Gtk.ToolButton about;
 		Gtk.ToolButton start;
 		Gtk.ToolButton pause;
@@ -88,19 +113,23 @@ namespace Harvest {
 		string harvest_subdomain;
 		string harvest_email;
 		string harvest_password;
+		int harvest_client;
 		int harvest_project;
 		int harvest_task;
 		int harvest_entry;
 		Timer timer;
 		uint timeout;
 
+		ComboBoxText client;
 		ComboBoxText project;
 		ComboBoxText task;
 		Gtk.Label status;
 
 		string VERSION = "0.1.4";
 
+		private ArrayList<Client?> clients;
 		private ArrayList<Project?> projects;
+		private ArrayList<Task?> tasks;
 
 		public Application() {
 			GLib.Object(application_id: "tkowalewski.harvest.gtk",flags: ApplicationFlags.FLAGS_NONE);
@@ -112,10 +141,14 @@ namespace Harvest {
 		}
 
 		protected override void activate() {
+			clients = new ArrayList<Client?>();
 			projects = new ArrayList<Project?>();
+			tasks = new Gee.ArrayList<Task?>();
+
 			window = new Gtk.Window();
 			window.set_title("Harvest");
 			window.default_width = 250;
+			window.default_height = 160;
 			window.window_position = Gtk.WindowPosition.CENTER;
 			//window.destroy.connect(() => Gtk.main_quit());
 			
@@ -124,17 +157,6 @@ namespace Harvest {
 			toolbar = new Gtk.Toolbar();
 			toolbar.toolbar_style = Gtk.ToolbarStyle.ICONS;
 			toolbar.set_icon_size(Gtk.IconSize.SMALL_TOOLBAR);
-
-			subdomain = new Gtk.Entry();
-			subdomain.placeholder_text = "subdomain";
-			email = new Gtk.Entry();
-			email.placeholder_text = "email@domain.tld";
-			password = new Gtk.Entry();
-			password.placeholder_text = "password";
-			password.set_visibility(false);
-
-			authentication = new Gtk.ToggleToolButton.from_stock(Gtk.Stock.DIALOG_AUTHENTICATION);
-			authentication.clicked.connect(on_authentication_toggle);
 
 			about = new Gtk.ToolButton.from_stock (Gtk.Stock.DIALOG_INFO);
 			about.clicked.connect(on_about_clicked);
@@ -155,40 +177,23 @@ namespace Harvest {
 			toolbar.insert(pause, -1);
 			toolbar.insert(stop, -1);
 			toolbar.insert(spacer, -1);
-			toolbar.insert(authentication, -1);
 			toolbar.insert(about, -1);
-
-			project = new ComboBoxText();
-			project.append("0", "Select project");
-			project.active = 0;
-			project.changed.connect(on_project_changed);
-
-			task = new ComboBoxText();
-			task.append("0", "Select task");
-			task.active = 0;
-			task.changed.connect(on_task_changed);
-
-			comment = new Gtk.Entry();
-			comment.placeholder_text = "Your comment";
 
 			status = new Gtk.Label("");
 			status.justify = Gtk.Justification.LEFT;
 
-			box.pack_start(subdomain, false, false, 0);
-			box.pack_start(email, false, false, 0);
-			box.pack_start(password, false, false, 0);
+			create_subdomain();
+			create_email();
+			create_password();
+			create_authentication();
+
 			box.pack_end(status, false, false, 0);
 			box.pack_end(toolbar, false, false, 0);
 			
-
 			window.add(box);
 
 			box.show();
-			subdomain.show();
-			email.show();
-			password.show();
 			toolbar.show();
-			authentication.show();
 			about.show();
 			spacer.show();
 			status.show();
@@ -204,117 +209,205 @@ namespace Harvest {
 			link.activate_link();
 		}
 
-		public void on_authentication_toggle() {
-			if (!authentication.active) {
-					
-				box.pack_start(subdomain, false, false, 0);
-				box.pack_start(email, false, false, 0);
-				box.pack_start(password, false, false, 0);
-				if (project != null) {
-					box.remove(project);
-				}
-				if (task != null) {
-					box.remove(task);
-				}
-				if (comment != null) {
-					box.remove(comment);
-				}
-				if (start != null) {
-					start.hide();
-				}
-				if (pause != null) {
-					pause.hide();
-				}
-				if (stop != null) {
-					stop.hide();
-				}
-				if (time != null) {
-					time.hide();
-				}
-
-				project.active = 0;
-				task.active = 0;
-
-				subdomain.show();
-				email.show();
-				password.show();
-				
-			} else {
-				status.label = "Please wait. Loading ...";
-				harvest_subdomain = subdomain.get_text();
-				harvest_email = email.get_text();
-				harvest_password = password.get_text();
-				if (!request_daily()) {
-					authentication.set_active(false);
-					status.label = "";
-					alert("Can not connect!");
-					return;
-				}
-				box.pack_start(project, false, false, 0);
-				box.pack_start(task, false, false, 0);
-				box.pack_start(comment, false, false, 0);
-				box.remove(subdomain);
-				box.remove(email);
-				box.remove(password);
-				start.show();
-				pause.show();
-				stop.show();
-				time.show();
-				project.show();
-				task.show();
-				comment.show();
-				start.set_sensitive(false);
-				pause.set_sensitive(false);
-				stop.set_sensitive(false);
-				task.set_sensitive(false);
-				comment.set_sensitive(false);
+		public void on_authentication_clicked() {
+			status.label = "Please wait. Loading ...";
+			harvest_subdomain = subdomain.get_text();
+			harvest_email = email.get_text();
+			harvest_password = password.get_text();
+			if (!request_daily()) {
 				status.label = "";
+				alert("Can not connect!");
+				return;
+			}
+			create_client();
+			remove_subdomain();
+			remove_email();
+			remove_password();
+			remove_authentication();
+			start.show();
+			pause.show();
+			stop.show();
+			time.show();
+			start.set_sensitive(false);
+			pause.set_sensitive(false);
+			stop.set_sensitive(false);
+			status.label = "";
+		}
+
+		public void create_authentication() {
+			authentication = new Gtk.Button.with_label ("Sign In");
+			authentication.clicked.connect(on_authentication_clicked);
+			box.pack_start(authentication, false, false, 0);
+			authentication.show();
+		}
+
+		public void remove_authentication() {
+			if (authentication != null) {
+				box.remove(authentication);
+			}
+			authentication = null;
+		}
+
+		public void create_subdomain() {
+			subdomain = new Gtk.Entry();
+			subdomain.placeholder_text = "subdomain";
+			box.pack_start(subdomain, false, false, 0);
+			subdomain.show();
+		}
+
+		public void remove_subdomain() {
+			if (subdomain != null) {
+				box.remove(subdomain);
+			}
+			subdomain = null;
+		}
+
+		public void create_email() {
+			email = new Gtk.Entry();
+			email.placeholder_text = "email@domain.tld";
+			box.pack_start(email, false, false, 0);
+			email.show();
+		}
+
+		public void remove_email() {
+			if (email != null) {
+				box.remove(email);
+			}
+			email = null;
+		}
+
+		public void create_password() {
+			password = new Gtk.Entry();
+			password.placeholder_text = "password";
+			password.set_visibility(false);
+			box.pack_start(password, false, false, 0);
+			password.show();
+		}
+
+		public void remove_password() {
+			if (password != null) {
+				box.remove(password);
+			}
+			password = null;
+		}
+
+		public void create_client() {
+			client = new ComboBoxText();
+			client.append("0", "Select client");
+			foreach(Client c in clients) {
+				client.append(c.id.to_string(), c.name);
+			}
+			client.active = 0;
+			client.changed.connect(on_client_changed);
+			box.pack_start(client, false, false, 0);
+			client.show();
+		}
+
+		public void remove_client() {
+			if (client != null) {
+				box.remove(client);
+			}
+			client = null;
+		}
+
+		public void create_project() {
+			project = new ComboBoxText();
+			project.append("0", "Select project");
+			foreach(Project _p in projects) {
+				if (_p.client_id == harvest_client) {
+					project.append(_p.id.to_string(), _p.name);
+				}
+			}
+			project.active = 0;
+			project.changed.connect(on_project_changed);
+			box.pack_start(project, false, false, 0);
+			project.show();
+		}
+
+		public void remove_project() {
+			if (project != null) {
+				box.remove(project);
+			}
+			project = null;
+		}
+
+		public void create_task() {
+			task = new ComboBoxText();
+			task.append("0", "Select task");
+			foreach(Task _t in tasks) {
+				if (_t.project_id == harvest_project) {
+					task.append(_t.id.to_string(), _t.name);
+				}
+			}
+			task.active = 0;
+			task.changed.connect(on_task_changed);
+			box.pack_start(task, false, false, 0);
+			task.show();
+		}
+
+		public void remove_task() {
+			if (task != null) {
+				box.remove(task);
+			}
+			task = null;
+		}
+
+		public void create_comment() {
+			comment = new Gtk.Entry();
+			comment.placeholder_text = "Your comment";
+			box.pack_start(comment, false, false, 0);
+			comment.show();
+		}
+
+		public void remove_comment() {
+			if (comment != null) {
+				box.remove(comment);
+			}
+			comment = null;
+		}
+
+		public void on_client_changed() {
+			remove_project();
+			remove_task();
+			remove_comment();
+			if (client.active > 0) {
+				harvest_client = int.parse(client.get_active_id());
+				harvest_project = 0;
+				harvest_task = 0;
+				create_project();
+			} else {
+				harvest_client = 0;
+				harvest_project = 0;
+				harvest_task = 0;
 			}
 		}
 
 		public void on_project_changed() {
+			remove_task();
+			remove_comment();
 			if (project.active > 0) {
-				task.remove_all();
-				task.append("0", "Select task");
-				task.active = 0;
 				harvest_project = int.parse(project.get_active_id());
-				foreach(Project _p in projects) {
-					if (_p.id == harvest_project) {
-						foreach(Task _t in _p.tasks) {
-							task.append(_t.id.to_string(), _t.name);
-						}
-						break;
-					}
-				}
 				harvest_task = 0;
-				task.set_sensitive(true);
+				create_task();
 			} else {
 				harvest_project = 0;
 				harvest_task = 0;
-				task.remove_all();
-				task.append("0", "Select task");
-				task.active = 0;
-				task.set_sensitive(false);
 			}
 		}
 
 		public void on_task_changed() {
+			remove_comment();
 			if (task.active > 0 ) {
-				harvest_project = int.parse(project.get_active_id());
 				harvest_task = int.parse(task.get_active_id());
+				create_comment();
 				start.set_sensitive(true);
-				comment.set_sensitive(true);
-				comment.set_text("");
 				pause.set_sensitive(false);
 				stop.set_sensitive(false);
 			} else {
-				harvest_project = int.parse(project.get_active_id());
-				harvest_task = 0;
 				start.set_sensitive(false);
 				pause.set_sensitive(false);
 				stop.set_sensitive(false);
-				comment.set_text("");
-				comment.set_sensitive(false);
+				harvest_task = 0;
 			}
 		}
 
@@ -334,10 +427,11 @@ namespace Harvest {
 				}
 			}
 
+			client.set_sensitive(false);
 			project.set_sensitive(false);
 			task.set_sensitive(false);
-			start.set_sensitive(false);
 			comment.set_sensitive(false);
+			start.set_sensitive(false);
 			pause.set_sensitive(true);
 			stop.set_sensitive(true);
 			if (paused) {
@@ -372,12 +466,13 @@ namespace Harvest {
 				alert("Can not stop!");
 				return;
 			}
+			client.set_sensitive(true);
 			project.set_sensitive(true);
 			task.set_sensitive(true);
+			comment.set_sensitive(true);
 			start.set_sensitive(true);
 			pause.set_sensitive(false);
 			stop.set_sensitive(false);
-			comment.set_sensitive(true);
 			Source.remove(timeout);
 			time.set_label("00:00:00");
 			timer.stop();
@@ -430,6 +525,7 @@ namespace Harvest {
 			if (response == null) {
 				return false;
 			}
+			int last_client_id = 0;
 			Xml.Node* rootNode = response->get_root_element();
 			for(Xml.Node* i1 = rootNode->children; i1 != null; i1 = i1->next) {
 				if(i1->type != ElementType.ELEMENT_NODE) {
@@ -443,11 +539,21 @@ namespace Harvest {
 						}
 						if (i2->name == "project") {
 							Project p = new Project();
-							ArrayList<Task?> _t = new ArrayList<Task?>();
+							Client c = new Client();
 							Xml.Node *i3;
 							for(i3 = i2->children->next; i3 != null; i3 = i3->next) {
 								if(i3->is_text() != 1) {
 									switch(i3->name) {
+										case "client":
+											c.name = i3->get_content();
+										break;
+
+										case "client_id":
+											c.id = int.parse(i3->get_content());
+											
+											p.client_id = int.parse(i3->get_content());
+										break;
+
 										case "name":
 											p.name = i3->get_content();
 										break;
@@ -470,6 +576,7 @@ namespace Harvest {
 															switch(i5->name) {
 																case "name":
 																	t.name = i5->get_content();
+																	t.project_id = p.id;
 																break;
 
 																case "id":
@@ -479,7 +586,7 @@ namespace Harvest {
 														}
 													}
 													delete i5;
-													_t.add(t);
+													tasks.add(t);
 												}
 											}
 											delete i4;
@@ -488,15 +595,16 @@ namespace Harvest {
 								}
 							}
 							delete i3;
-							p.tasks = _t;
 							projects.add(p);
+
+							if (last_client_id != c.id) {
+								last_client_id = c.id;
+								clients.add(c);
+							}
 						}
 					}
 					delete i2;
 				}
-			}
-			foreach(Project p in projects) {
-				project.append(p.id.to_string(), p.name);
 			}
 			return true;
 		}
@@ -555,6 +663,7 @@ namespace Harvest {
 				return Xml.Parser.parse_doc("");
 			}
 			session.abort();
+			//stdout.printf((string)message.response_body.flatten().data);
 			return Xml.Parser.parse_doc((string)message.response_body.flatten().data);
 		}
 
