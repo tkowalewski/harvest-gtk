@@ -125,7 +125,7 @@ namespace Harvest {
 		ComboBoxText task;
 		Gtk.Label status;
 
-		string VERSION = "0.1.4";
+		string VERSION = "0.2.0";
 
 		private ArrayList<Client?> clients;
 		private ArrayList<Project?> projects;
